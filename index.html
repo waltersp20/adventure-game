@@ -1,1 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Island Adventure — Build, Fish & Explore</title>
+<style>
+:root{--glass:rgba(12,34,38,.82);--gold:#f0c777;--white:#fff}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#8bd9f2;font-family:system-ui,-apple-system,Segoe UI,sans-serif}canvas{display:block}
+#hud{position:fixed;inset:0;color:var(--white);text-shadow:0 2px 3px #17333c;pointer-events:none}
+#title{position:absolute;left:18px;top:14px;font-size:20px;font-weight:900;letter-spacing:.5px}
+#stats{position:absolute;left:18px;top:51px;background:var(--glass);border:1px solid #ffffff28;border-radius:12px;padding:10px 13px;font-size:14px;line-height:1.8;min-width:190px}
+#help{position:absolute;left:18px;bottom:16px;background:var(--glass);border:1px solid #ffffff25;border-radius:12px;padding:10px 13px;font-size:12px;line-height:1.65;max-width:310px}
+#message{position:absolute;left:50%;top:18%;transform:translateX(-50%);background:var(--glass);border:1px solid #ffffff30;border-radius:12px;padding:11px 17px;font-weight:750;opacity:0;transition:opacity .18s;text-align:center;max-width:min(90vw,500px)}
+#prompt{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);background:#0b2229cc;border:1px solid #ffffff50;border-radius:9px;padding:8px 12px;font-size:13px;opacity:0;white-space:nowrap}
+#crosshair{position:absolute;left:50%;top:50%;width:8px;height:8px;border:1.5px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 3px #000}
+#fishPanel{position:absolute;right:18px;top:18px;background:var(--glass);border:1px solid #ffffff30;border-radius:12px;padding:12px 14px;min-width:175px;max-width:220px;font-size:13px}
+#fishPanel h3{margin:0 0 7px;font-size:14px}#fishList{line-height:1.7;max-height:180px;overflow:auto}
+#catchWrap{position:absolute;left:50%;top:58%;transform:translateX(-50%);width:240px;text-align:center;display:none}
+#catchLabel{font-weight:800;margin-bottom:6px}#catchBar{height:12px;background:#132d35cc;border:1px solid #fff;border-radius:9px;overflow:hidden}#catchFill{height:100%;width:0;background:linear-gradient(90deg,#f0b34e,#fff0a0)}
+.panel{display:none;position:fixed;right:20px;top:50%;transform:translateY(-50%);width:255px;color:white;background:var(--glass);border:1px solid #ffffff50;border-radius:15px;padding:15px;box-shadow:0 10px 32px #0005;z-index:4;text-shadow:none}
+.panel h3{margin:0 0 8px}.panel p{font-size:13px;line-height:1.5;color:#e4f0ed}.gameBtn{width:100%;padding:10px;margin:5px 0;border:0;border-radius:9px;background:var(--gold);color:#302719;font-weight:800;cursor:pointer}.gameBtn:hover{filter:brightness(1.08)}.gameBtn:disabled{opacity:.45;cursor:not-allowed}
+#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(#164e6040,#082a32a6);z-index:10;color:white;text-align:center;padding:20px}
+#startBox{max-width:450px;padding:26px 30px;background:#102e37ef;border:1px solid #ffffff3a;border-radius:18px;box-shadow:0 15px 45px #0005}#startBox h1{margin:0 0 8px;font-size:30px}#startBox p{line-height:1.6;color:#e0eeee}#startBtn{border:0;border-radius:10px;padding:12px 24px;background:var(--gold);font-size:16px;font-weight:900;cursor:pointer}
+@media(max-width:600px){#fishPanel{top:auto;bottom:15px;right:12px;min-width:135px;padding:9px}#help{bottom:15px;max-width:190px;font-size:11px}#stats{top:48px;min-width:155px;font-size:12px}#title{font-size:17px}#fishList{max-height:100px}}
+</style>
+</head>
+<body>
+<div id="hud">
+ <div id="title">🏝️ ISLAND ADVENTURE</div>
+ <div id="stats">🪵 Wood: <b id="wood">0</b><br>🎣 Rod: <b id="rodStatus">Not owned</b><br>🐒 Monkey coins: <b id="coins">0</b><br>🔥 Cooked fish: <b id="cooked">0</b></div>
+ <div id="crosshair"></div><div id="message"></div><div id="prompt"></div>
+ <div id="fishPanel"><h3>🎒 Fish inventory <span id="fishCount">(0)</span></h3><div id="fishList">No fish yet — try fishing!</div></div>
+ <div id="catchWrap"><div id="catchLabel">Reel in! Press SPACE repeatedly</div><div id="catchBar"><div id="catchFill"></div></div></div>
+ <div id="help"><b>CONTROLS</b><br>W — Forward · S — Back · A/D — Left/Right · Mouse — Look<br>Space — Jump / reel in fish<br>E — Interact / gather / cook / sell<br>Left click — Cast fishing line<br>B — Build menu · Esc — Release mouse</div>
+</div>
+<div id="buildPanel" class="panel"><h3>🔨 Build</h3><button class="gameBtn" id="hutBtn">🛖 Wooden hut — 5 wood</button><p>The campfire is already on the island. Build a hut for shelter. Bigger, rarer fish weigh more and earn more monkey coins.</p><button class="gameBtn" id="closeBuild">Close</button></div>
+<div id="start"><div id="startBox"><h1>Island Adventure</h1><p>Explore a tropical island, collect wood, fish from the shore, cook your catch and sell fish to the tree-dwelling monkey.</p><p><b>Tip:</b> Find the barrel near the beach for a fishing rod. The campfire is already in the clearing.</p><button id="startBtn">Start exploring</button></div></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+
+(()=>{
+
+'use strict';
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9adff4);
+scene.fog=new THREE.Fog(0x9adff4,48,125);
+
+const camera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.1,180);
+
+const renderer=new THREE.WebGLRenderer({
+antialias:true,powerPreference:'high-performance'}
+);
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.12;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+// Procedural atmospheric sky dome: horizon haze, zenith gradient and sun glow.
+const skyGeo=new THREE.SphereGeometry(150,48,32);
+
+const skyMat=new THREE.ShaderMaterial({
+side:THREE.BackSide,depthWrite:false,uniforms:{
+sunDirection:{
+value:new THREE.Vector3(-.45,.72,.35).normalize()}
+,time:{
+value:0}
+}
+,vertexShader:`varying vec3 vWorld; void main(){ vec4 wp=modelMatrix*vec4(position,1.0); vWorld=normalize(wp.xyz-cameraPosition); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,fragmentShader:`varying vec3 vWorld; uniform vec3 sunDirection; uniform float time; void main(){ vec3 d=normalize(vWorld); float h=max(d.y,0.0); vec3 horizon=vec3(0.78,0.89,0.96); vec3 zenith=vec3(0.055,0.29,0.56); vec3 sky=mix(horizon,zenith,pow(h,0.62)); float haze=pow(1.0-abs(d.y),7.0); sky=mix(sky,vec3(0.96,0.83,0.65),haze*0.24); float sun=max(dot(d,normalize(sunDirection)),0.0); sky+=vec3(1.0,0.72,0.42)*pow(sun,180.0)*2.4; sky+=vec3(1.0,0.83,0.62)*pow(sun,12.0)*0.22; gl_FragColor=vec4(sky,1.0); }`}
+);
+const sky=new THREE.Mesh(skyGeo,skyMat);
+sky.frustumCulled=false;
+scene.add(sky);
+
+const hemi=new THREE.HemisphereLight(0xe4f8ff,0x6b5432,2.0);
+scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xffefcf,3);
+sun.position.set(-18,30,14);
+sun.castShadow=true;
+sun.shadow.mapSize.set(1536,1536);
+Object.assign(sun.shadow.camera,{
+left:-28,right:28,top:28,bottom:-28,near:.5,far:80}
+);
+sun.shadow.bias=-.0002;
+scene.add(sun);
+
+// Soft procedural cloud banks. Translucent clustered sprites move slowly overhead.
+const clouds=[];
+const cloudMat=new THREE.MeshStandardMaterial({
+color:0xffffff,transparent:true,opacity:.72,roughness:1,depthWrite:false}
+);
+
+for(let i=0;
+i<18;
+i++){
+const cloud=new THREE.Group();
+const cx=(Math.random()-.5)*100,cz=(Math.random()-.5)*100;
+cloud.position.set(cx,18+Math.random()*9,cz);
+for(let j=0;
+j<5+Math.floor(Math.random()*5);
+j++){
+const puff=new THREE.Mesh(new THREE.SphereGeometry(1.4+Math.random()*2.2,10,7),cloudMat);
+puff.position.set((Math.random()-.5)*5,(Math.random()-.5)*.7,(Math.random()-.5)*2);
+puff.scale.y=.28+Math.random()*.2;
+cloud.add(puff);
+}
+scene.add(cloud);
+clouds.push(cloud);
+}
+
+const mat=(c,r=1,metal=0)=>new THREE.MeshStandardMaterial({
+color:c,roughness:r,metalness:metal}
+);
+
+const M={
+sand:mat(0xe7c98b),sandLight:mat(0xf1dca7),grass:mat(0x4d9845),grass2:mat(0x68ad50),darkGrass:mat(0x347746),bark:mat(0x795035),barkLight:mat(0xa7784d),leaf:mat(0x207449),leaf2:mat(0x369653),leaf3:mat(0x64b65d),stone:mat(0x7b8580),stoneLight:mat(0xa4aaa0),wood:mat(0x9a6438),plank:mat(0xc28c50),rope:mat(0xc9ae7b),water:mat(0x239fc5,.28,.08),skin:mat(0xe9b68b),shirt:mat(0x2c7fc0),pants:mat(0x263b51),boot:mat(0x49382c),hair:mat(0x513322)}
+;
+
+// Large procedural ocean shader: layered waves, Fresnel reflections and sun glints.
+const waterMat=new THREE.ShaderMaterial({
+uniforms:{
+uTime:{
+value:0}
+,uSun:{
+value:new THREE.Vector3(-.45,.72,.35).normalize()}
+}
+,vertexShader:`varying vec3 vWorld; varying vec2 vUv; uniform float uTime; void main(){vUv=uv; vec3 p=position; float w=sin(p.x*.12+uTime*1.1)*.075+sin(p.y*.17-uTime*.8)*.045+sin((p.x+p.y)*.09+uTime*.65)*.035; p.z+=w; vec4 world=modelMatrix*vec4(p,1.0); vWorld=world.xyz; gl_Position=projectionMatrix*viewMatrix*world;}`,fragmentShader:`varying vec3 vWorld; varying vec2 vUv; uniform float uTime; uniform vec3 uSun; void main(){vec3 viewDir=normalize(cameraPosition-vWorld); float fresnel=pow(1.0-max(dot(viewDir,vec3(0.0,1.0,0.0)),0.0),3.0); float wave=sin(vWorld.x*.45+uTime)*sin(vWorld.z*.38-uTime*.7); float wave2=sin(vWorld.x*.92-uTime*.65+sin(vWorld.z*.3))*0.5; vec3 deep=vec3(.018,.27,.39); vec3 shallow=vec3(.035,.56,.66); vec3 col=mix(deep,shallow,clamp(.45+wave*.12+wave2*.08,0.0,1.0)); col=mix(col,vec3(.48,.78,.81),fresnel*.55); float sparkle=pow(max(0.0,sin(vWorld.x*2.0+uTime*1.8)*sin(vWorld.z*1.8-uTime)),22.0); col+=vec3(.6,.78,.8)*sparkle*.25; gl_FragColor=vec4(col,1.0);}`,side:THREE.DoubleSide}
+);
+const ocean=new THREE.Mesh(new THREE.PlaneGeometry(260,260,180,180),waterMat);
+ocean.rotation.x=-Math.PI/2;
+ocean.position.y=-1.25;
+ocean.receiveShadow=true;
+scene.add(ocean);
+
+// Irregular island layers. The old decorative torus beach ring is intentionally removed: it caused the odd line around the beach.
+function makeIslandLayer(radius,height,material,segments=96,irregular=.025){
+const pts=[];
+for(let i=0;
+i<segments;
+i++){
+const a=i/segments*Math.PI*2;
+const rr=radius*(1+irregular*Math.sin(a*3+.5)+irregular*.45*Math.sin(a*7+1.4)+irregular*.25*Math.cos(a*11));
+pts.push(new THREE.Vector2(Math.cos(a)*rr,Math.sin(a)*rr));
+}
+const shape=new THREE.Shape(pts);
+const geo=new THREE.ExtrudeGeometry(shape,{
+depth:height,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.22,bevelThickness:.18,curveSegments:2}
+);
+geo.rotateX(-Math.PI/2);
+const mesh=new THREE.Mesh(geo,material);
+mesh.position.y=.0;
+mesh.castShadow=true;
+mesh.receiveShadow=true;
+scene.add(mesh);
+return mesh;
+}
+
+// Extruded top surface sits at approximately y=height; use layered cylinders for stable walkable ground.
+function coastRadius(radius,a,amount=1){
+return radius*(1+amount*(.045*Math.sin(a*3+.45)+.026*Math.sin(a*5+1.7)+.018*Math.cos(a*8-.6)+.012*Math.sin(a*13)));
+}
+
+function makeRadialLand(topRadius,bottomRadius,bottomY,topY,material,segments=144,irregular=1){
+const verts=[],indices=[];
+for(let ring=0;
+ring<2;
+ring++){
+const r0=ring?topRadius:bottomRadius,y=ring?topY:bottomY;
+for(let i=0;
+i<segments;
+i++){
+const a=i/segments*Math.PI*2,r=coastRadius(r0,a,irregular);
+verts.push(Math.cos(a)*r,y,Math.sin(a)*r);
+}
+}
+for(let i=0;
+i<segments;
+i++){
+const n=(i+1)%segments;
+indices.push(i,n,segments+n,i,segments+n,segments+i);
+indices.push(segments,segments+i,segments+n);
+indices.push(0,n,i);
+ }
+const geo=new THREE.BufferGeometry();
+geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+geo.setIndex(indices);
+geo.computeVertexNormals();
+const mesh=new THREE.Mesh(geo,material);
+mesh.castShadow=true;
+mesh.receiveShadow=true;
+scene.add(mesh);
+return mesh;
+}
+
+// A hand-shaped coastline replaces the perfect circular island. The sand top is level with the grass so the beach is walkable.
+const sandBase=makeRadialLand(14.25,13.15,-1.18,1.505,M.sand,144,1);
+
+const grassBase=makeRadialLand(10.98,12.15,.32,1.50,M.grass,144,1);
+
+const grassTop=new THREE.Mesh(new THREE.CircleGeometry(10.94,144),M.grass);
+grassTop.rotation.x=-Math.PI/2;
+grassTop.position.y=1.506;
+grassTop.receiveShadow=true;
+scene.add(grassTop);
+
+// Slightly irregular sand patches and wet-sand gradients along the shore
+for(let i=0;
+i<190;
+i++){
+const a=Math.random()*Math.PI*2,r=10.8+Math.random()*2.95;
+const s=.12+Math.random()*.3;
+const patch=new THREE.Mesh(new THREE.CircleGeometry(s,7),i%4===0?M.sandLight:M.sand);
+patch.rotation.x=-Math.PI/2;
+patch.position.set(Math.cos(a)*r,.985+Math.random()*.008,Math.sin(a)*r);
+patch.scale.set(1+Math.random()*1.8,1,1);
+patch.rotation.z=Math.random()*Math.PI;
+scene.add(patch);
+}
+
+// Grass tufts, tiny flowers and fern-like plants
+for(let i=0;
+i<210;
+i++){
+const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*10.35,x=Math.cos(a)*r,z=Math.sin(a)*r;
+const h=.12+Math.random()*.2;
+const tuft=new THREE.Group();
+tuft.position.set(x,1.53,z);
+for(let j=0;
+j<3;
+j++){
+const blade=new THREE.Mesh(new THREE.ConeGeometry(.045,h,4),j%2?M.grass2:M.darkGrass);
+blade.position.set((j-1)*.055,h*.45,Math.sin(j*3)*.04);
+blade.rotation.z=(j-1)*.3;
+tuft.add(blade);
+}
+scene.add(tuft);
+if(i%13===0){
+const flower=new THREE.Mesh(new THREE.SphereGeometry(.055,7,5),mat(i%2?0xffe8a0:0xff9eaa));
+flower.position.set(x,1.7,z);
+scene.add(flower);
+}
+}
+
+// Broken turquoise shallows and soft foam flecks create a more natural transition into the sea.
+const shallowsMat=new THREE.MeshBasicMaterial({
+color:0x56d2d0,transparent:true,opacity:.20,depthWrite:false,side:THREE.DoubleSide}
+);
+const foamMat=new THREE.MeshBasicMaterial({
+color:0xf7fff0,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide}
+);
+
+for(let i=0;
+i<105;
+i++){
+const a=Math.random()*Math.PI*2,r=13.8+Math.random()*1.45,s=.22+Math.random()*.75;
+const patch=new THREE.Mesh(new THREE.CircleGeometry(s,10),i%4===0?foamMat:shallowsMat);
+patch.rotation.x=-Math.PI/2;
+patch.rotation.z=Math.random()*Math.PI;
+patch.position.set(Math.cos(a)*r,-1.225+Math.random()*.008,Math.sin(a)*r);
+patch.scale.set(1.1+Math.random()*1.8,.65+Math.random()*.6,1);
+scene.add(patch);
+}
+
+// A few low beach plants soften the grass-to-sand edge.
+for(let i=0;
+i<42;
+i++){
+const a=Math.random()*Math.PI*2,r=10.55+Math.random()*.7,x=Math.cos(a)*r,z=Math.sin(a)*r;
+const plant=new THREE.Group();
+plant.position.set(x,1.51,z);
+for(let j=0;
+j<4;
+j++){
+const blade=new THREE.Mesh(new THREE.ConeGeometry(.07,.42+Math.random()*.25,5),j%2?M.grass2:M.darkGrass);
+blade.position.set((Math.random()-.5)*.18,.18,(Math.random()-.5)*.18);
+blade.rotation.z=(Math.random()-.5)*.75;
+plant.add(blade);
+}
+scene.add(plant);
+}
+
+// Rocks, shells and driftwood around the sandy shoreline
+for(let i=0;
+i<45;
+i++){
+const a=Math.random()*Math.PI*2,r=11.0+Math.random()*2.75;
+const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.16+Math.random()*.38,1),i%3===0?M.stoneLight:M.stone);
+rock.position.set(Math.cos(a)*r,1.0+Math.random()*.04,Math.sin(a)*r);
+rock.scale.set(1+Math.random(),.5+Math.random()*.5,.8+Math.random());
+rock.rotation.set(Math.random(),Math.random(),Math.random());
+rock.castShadow=true;
+scene.add(rock);
+}
+
+for(let i=0;
+i<24;
+i++){
+const a=Math.random()*Math.PI*2,r=10.7+Math.random()*2.75;
+const shell=new THREE.Mesh(new THREE.SphereGeometry(.11,8,5),mat(i%2?0xf4e5c4:0xd8b98c));
+shell.scale.set(1.4,.45,1);
+shell.position.set(Math.cos(a)*r,1.02,Math.sin(a)*r);
+shell.rotation.y=Math.random()*6;
+scene.add(shell);
+}
+
+// Palm trees with curved segmented trunks and layered fronds
+const trees=[];
+
+function palm(x,z,scale=1){
+const g=new THREE.Group();
+g.position.set(x,1.5,z);
+g.scale.setScalar(scale);
+const lean=(Math.random()-.5)*.28;
+for(let j=0;
+j<8;
+j++){
+const y=j*.43;
+const seg=new THREE.Mesh(new THREE.CylinderGeometry(.28-j*.012,.31-j*.008,.48,9),j%2?M.bark:M.barkLight);
+seg.position.set(lean*y,y+.22,lean*y*.35);
+seg.rotation.z=-lean*.55;
+seg.castShadow=true;
+g.add(seg);
+const ring=new THREE.Mesh(new THREE.TorusGeometry(.285-j*.009,.022,4,9),M.bark);
+ring.position.set(lean*y,y+.42,lean*y*.35);
+ring.rotation.x=Math.PI/2;
+g.add(ring);
+}
+const crownY=3.62;
+for(let i=0;
+i<10;
+i++){
+const a=i/10*Math.PI*2;
+const leafGroup=new THREE.Group();
+leafGroup.position.set(lean*3.2,crownY,lean*1.1);
+leafGroup.rotation.y=a;
+const stem=new THREE.Mesh(new THREE.CylinderGeometry(.035,.055,2.5,5),M.leaf2);
+stem.rotation.x=Math.PI/2;
+stem.position.z=1.05;
+leafGroup.add(stem);
+const leaf=new THREE.Mesh(new THREE.ConeGeometry(.38,2.7,7),i%3===0?M.leaf3:(i%2?M.leaf:M.leaf2));
+leaf.rotation.x=Math.PI/2;
+leaf.position.set(0,-.05,1.55);
+leaf.scale.set(.75,.55,1.0);
+leaf.castShadow=true;
+leafGroup.add(leaf);
+for(let k=0;
+k<7;
+k++){
+const leaflet=new THREE.Mesh(new THREE.ConeGeometry(.12,.78,4),k%2?M.leaf:M.leaf2);
+leaflet.position.set((k-3)*.19,-.28,1.15+k*.2);
+leaflet.rotation.x=Math.PI/2;
+leaflet.rotation.z=(k-3)*-.18;
+leafGroup.add(leaflet);
+}
+g.add(leafGroup);
+}
+const nuts=new THREE.Group();
+for(let i=0;
+i<3;
+i++){
+const n=new THREE.Mesh(new THREE.SphereGeometry(.14,9,7),mat(0x6a4226));
+n.position.set(Math.cos(i*2.1)*.18,-.05,Math.sin(i*2.1)*.18);
+nuts.add(n);
+}
+nuts.position.set(lean*3.2,crownY-.18,lean);
+g.add(nuts);
+scene.add(g);
+trees.push({
+x,z,group:g,ready:true}
+);
+return g;
+}
+
+[[-4,-3,1.02],[4,-2,.94],[-6,3,.93],[6,4,1.02],[1,6,.9],[-1,1,.82],[-8,-1,.78],[8,-3,.82]].forEach(p=>palm(...p));
+
+// Tropical broadleaf bushes
+function bush(x,z,s=1){
+const g=new THREE.Group();
+g.position.set(x,1.5,z);
+for(let i=0;
+i<7;
+i++){
+const leaf=new THREE.Mesh(new THREE.SphereGeometry(.48,9,7),i%2?M.leaf2:M.leaf);
+leaf.position.set((Math.random()-.5)*.9,Math.random()*.65,(Math.random()-.5)*.9);
+leaf.scale.set(1,.7,1.1);
+leaf.castShadow=true;
+g.add(leaf);
+}
+g.scale.setScalar(s);
+scene.add(g);
+}
+
+[[-8,5,.8],[8,1,.7],[-7,-5,.8],[5,7,.7],[-2,-7,.7]].forEach(p=>bush(...p));
+
+// Small rock clusters and a landmark boulder
+for(let i=0;
+i<16;
+i++){
+const a=Math.random()*Math.PI*2,r=5+Math.random()*5;
+const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.25+Math.random()*.5,1),i%3?M.stone:M.stoneLight);
+rock.position.set(Math.cos(a)*r,1.5,Math.sin(a)*r);
+rock.scale.y=.6;
+rock.rotation.set(Math.random(),Math.random(),Math.random());
+rock.castShadow=true;
+scene.add(rock);
+}
+
+// Character built from rounded shapes rather than boxy cuboids
+const player=new THREE.Group();
+scene.add(player);
+const skin=M.skin, shirt=M.shirt, pants=M.pants;
+
+function mesh(geo,material,parent,x=0,y=0,z=0){
+const o=new THREE.Mesh(geo,material);
+o.position.set(x,y,z);
+o.castShadow=true;
+o.receiveShadow=true;
+parent.add(o);
+return o;
+}
+
+function capsule(parent,r,len,material,x,y,z){
+const group=new THREE.Group();
+group.position.set(x,y,z);
+parent.add(group);
+mesh(new THREE.CylinderGeometry(r,r,len,12),material,group,0,0,0);
+mesh(new THREE.SphereGeometry(r,12,9),material,group,0,len/2,0);
+mesh(new THREE.SphereGeometry(r,12,9),material,group,0,-len/2,0);
+return group;
+}
+
+// local forward is +Z
+const torso=mesh(new THREE.CapsuleGeometry(.34,.56,5,10),shirt,player,0,1.38,0);
+torso.scale.set(.92,1,.72);
+
+const neck=mesh(new THREE.CylinderGeometry(.105,.12,.18,10),skin,player,0,1.82,0);
+
+const head=mesh(new THREE.SphereGeometry(.265,16,12),skin,player,0,2.08,0);
+head.scale.set(1,.98,.92);
+
+const hair=mesh(new THREE.SphereGeometry(.273,14,10,0,Math.PI*2,0,Math.PI*.58),M.hair,player,0,2.15,-.025);
+
+// Face, eyes, nose and smile face +Z
+const eyeMat=mat(0x202a30),white=mat(0xffffff),mouthMat=mat(0x8c5143);
+
+mesh(new THREE.SphereGeometry(.035,8,6),white,player,-.09,2.105,.228);
+mesh(new THREE.SphereGeometry(.035,8,6),white,player,.09,2.105,.228);
+
+mesh(new THREE.SphereGeometry(.018,7,5),eyeMat,player,-.09,2.105,.257);
+mesh(new THREE.SphereGeometry(.018,7,5),eyeMat,player,.09,2.105,.257);
+
+mesh(new THREE.SphereGeometry(.045,8,6),skin,player,0,2.04,.25);
+
+const smile=mesh(new THREE.TorusGeometry(.055,.009,5,10,Math.PI),mouthMat,player,0,1.99,.239);
+smile.rotation.z=Math.PI;
+
+const armL=capsule(player,.105,.43,shirt,-.39,1.42,0),armR=capsule(player,.105,.43,shirt,.39,1.42,0);
+armL.rotation.z=-.13;
+armR.rotation.z=.13;
+
+const handL=mesh(new THREE.SphereGeometry(.105,10,8),skin,player,-.4,1.13,.02),handR=mesh(new THREE.SphereGeometry(.105,10,8),skin,player,.4,1.13,.02);
+
+const legL=capsule(player,.135,.4,pants,-.17,.61,0),legR=capsule(player,.135,.4,pants,.17,.61,0);
+
+const bootL=mesh(new THREE.SphereGeometry(.15,10,8),mat(0x49382c),player,-.17,.22,.07);
+bootL.scale.set(1,.65,1.35);
+const bootR=mesh(new THREE.SphereGeometry(.15,10,8),mat(0x49382c),player,.17,.22,.07);
+bootR.scale.set(1,.65,1.35);
+
+player.position.set(0,1.53,7);
+
+// Fishing rod, barrel, campfire, and friendly monkey
+const interactables=[];
+let rodOwned=false,coins=0,wood=0,builds=0,cooked=0;
+const fishInventory=[];
+let activeCast=null,catchProgress=0,spacePresses=0;
+let campfires=[];
+
+function barrelModel(x,z){
+const g=new THREE.Group();
+g.position.set(x,1.52,z);
+const body=mesh(new THREE.CylinderGeometry(.42,.36,.9,12),M.wood,g,0,.43,0);
+body.rotation.z=.03;
+for(let i=0;
+i<5;
+i++){
+const hoop=mesh(new THREE.TorusGeometry(.39+i*.008,.035,5,14),mat(0x51402b),g,0,.18+i*.18,0);
+hoop.rotation.x=Math.PI/2;
+}
+const lid=mesh(new THREE.CylinderGeometry(.37,.37,.07,12),M.plank,g,0,.9,0);
+const rods=new THREE.Group();
+rods.position.set(.05,.85,0);
+g.add(rods);
+for(let i=0;
+i<4;
+i++){
+const rod=mesh(new THREE.CylinderGeometry(.018,.028,1.5,6),mat(0x6e5033),rods,(i-1.5)*.13,.48,0);
+rod.rotation.z=(i-1.5)*-.06;
+mesh(new THREE.SphereGeometry(.035,6,5),mat(0xe0c78c),rods,(i-1.5)*.13,1.24,0);
+}
+scene.add(g);
+interactables.push({
+type:'barrel',x,z,group:g}
+);
+}
+
+barrelModel(-7.0,6.5);
+
+function makeCampfire(x,z,addInteract=true){
+const g=new THREE.Group();
+g.position.set(x,1.54,z);
+for(let i=0;
+i<4;
+i++){
+const log=mesh(new THREE.CylinderGeometry(.09,.11,.85,7),M.wood,g,0,.12,0);
+log.rotation.z=Math.PI/2;
+log.rotation.y=i*Math.PI/4;
+}
+const stones=mat(0x6e7775);
+for(let i=0;
+i<8;
+i++){
+const a=i/8*Math.PI*2;
+const rock=mesh(new THREE.DodecahedronGeometry(.15,1),stones,g,Math.cos(a)*.48,.09,Math.sin(a)*.48);
+rock.scale.set(1,.65,1);
+}
+const flameMat=new THREE.MeshStandardMaterial({
+color:0xff8c27,emissive:0xff4c08,emissiveIntensity:1.2,roughness:.5}
+);
+const flame=mesh(new THREE.ConeGeometry(.27,.72,7),flameMat,g,0,.55,0);
+const inner=mesh(new THREE.ConeGeometry(.14,.47,7),new THREE.MeshStandardMaterial({
+color:0xffe58a,emissive:0xffa52a,emissiveIntensity:1.4}
+),g,0,.48,0);
+const light=new THREE.PointLight(0xff8c35,1.25,5);
+light.position.y=.65;
+g.add(light);
+scene.add(g);
+if(addInteract){
+campfires.push({
+x,z,group:g,flame,inner,light}
+);
+interactables.push({
+type:'fire',x,z,group:g}
+);
+}
+return g;
+}
+
+makeCampfire(3.3,6.6,true);
+
+// Monkey perched in a tree, with rounded limbs and a little face
+function makeMonkey(x,z){
+const g=new THREE.Group();
+g.position.set(x,4.1,z);
+const brown=mat(0x80502e),tan=mat(0xd6a878),dark=mat(0x2b241d);
+mesh(new THREE.SphereGeometry(.43,14,11),brown,g,0,0,0).scale.set(.9,1.1,.85);
+mesh(new THREE.SphereGeometry(.31,12,10),brown,g,0,.48,.04);
+mesh(new THREE.SphereGeometry(.23,12,9),tan,g,0,.43,.23);
+for(const s of [-1,1]){
+mesh(new THREE.SphereGeometry(.11,9,7),brown,g,s*.25,.61,.02);
+mesh(new THREE.SphereGeometry(.045,8,6),white,g,s*.09,.5,.425);
+mesh(new THREE.SphereGeometry(.023,7,5),dark,g,s*.09,.5,.462);
+const arm=mesh(new THREE.CapsuleGeometry(.07,.36,4,8),brown,g,s*.39,.05,.1);
+arm.rotation.z=s*.55;
+const leg=mesh(new THREE.CapsuleGeometry(.085,.28,4,8),brown,g,s*.22,-.34,.04);
+leg.rotation.z=-s*.4;
+}
+mesh(new THREE.SphereGeometry(.06,8,6),dark,g,0,.43,.45);
+const smile=mesh(new THREE.TorusGeometry(.075,.012,5,12,Math.PI),dark,g,0,.355,.425);
+smile.rotation.z=Math.PI;
+const tail=mesh(new THREE.TorusGeometry(.3,.055,7,16,Math.PI*1.5),brown,g,.35,-.1,-.12);
+tail.rotation.y=Math.PI/2;
+const banana=mesh(new THREE.CapsuleGeometry(.045,.22,4,7),mat(0xf4cf42),g,.34,-.12,.23);
+banana.rotation.z=-.55;
+const pouch=mesh(new THREE.BoxGeometry(.2,.2,.1),mat(0x9a6b35),g,-.31,-.17,.12);
+mesh(new THREE.TorusGeometry(.055,.012,5,10),mat(0xe6b94e,.4,.3),g,-.31,-.17,.18);
+scene.add(g);
+interactables.push({
+type:'monkey',x,z,group:g}
+);
+return g;
+}
+
+makeMonkey(6,4);
+
+// Visual fishing rod held by the player while equipped
+const heldRod=new THREE.Group();
+heldRod.position.set(0,0,.075);
+handR.add(heldRod);
+heldRod.rotation.z=-.38;
+heldRod.rotation.x=-.08;
+const rodWood=mat(0x694326),rodMetal=mat(0xb7c5c6,.42,.55);
+const rodStick=mesh(new THREE.CylinderGeometry(.012,.027,1.62,8),rodWood,heldRod,0,.78,0);
+rodStick.rotation.z=-.13;
+const rodGrip=mesh(new THREE.CylinderGeometry(.035,.04,.25,8),mat(0x292f31),heldRod,0,.18,0);
+rodGrip.rotation.z=-.13;
+const reel=new THREE.Group();
+reel.position.set(-.095,.29,.015);
+heldRod.add(reel);
+mesh(new THREE.CylinderGeometry(.075,.075,.045,12),rodMetal,reel,0,0,0).rotation.x=Math.PI/2;
+mesh(new THREE.TorusGeometry(.055,.009,5,12),mat(0x303b3c),reel,0,0,.028);
+const lineGuideMat=mat(0xc9d5d4,.45,.4);
+for(let i=0;
+i<4;
+i++){
+const y=.48+i*.31;
+const guide=mesh(new THREE.TorusGeometry(.025-i*.004,.005,4,8),lineGuideMat,heldRod,0,y,0);
+guide.rotation.x=Math.PI/2;
+}
+heldRod.visible=false;
+
+// Fishing line is a dynamic line from rod tip to a bobber floating beside the island
+const lineMat=new THREE.LineBasicMaterial({
+color:0xf7f0d7}
+);
+let fishingLine=null,bobber=null;
+
+function clearLine(){
+if(fishingLine){
+scene.remove(fishingLine);
+fishingLine.geometry.dispose();
+fishingLine=null;
+}
+if(bobber){
+scene.remove(bobber);
+bobber=null;
+}
+}
+
+function updateLine(){
+if(!activeCast||!rodOwned)return;
+const start=heldRod.getWorldPosition(new THREE.Vector3());
+const pts=[start,activeCast.bobberPos];
+if(fishingLine){
+fishingLine.geometry.setFromPoints(pts);
+}
+else{
+fishingLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lineMat);
+scene.add(fishingLine);
+}
+}
+
+// HUD helpers
+const $=id=>document.getElementById(id);
+const msg=$('message'),prompt=$('prompt');
+let msgTimer;
+function say(s){
+msg.textContent=s;
+msg.style.opacity=1;
+clearTimeout(msgTimer);
+msgTimer=setTimeout(()=>msg.style.opacity=0,2300);
+}
+function updateHUD(){
+$('wood').textContent=wood;
+$('coins').textContent=coins;
+$('cooked').textContent=cooked;
+$('rodStatus').textContent=rodOwned?'Equipped':'Not owned';
+$('fishCount').textContent='('+fishInventory.length+')';
+$('fishList').innerHTML=fishInventory.length?fishInventory.map((f,i)=>`${i+1}. ${f.name} <span style="opacity:.85">${f.weight.toFixed(2)} kg · ${f.value} 🐒</span> <span style="opacity:.7">(${f.cooked?'cooked':'raw'})</span>`).join('<br>'):'No fish yet — try fishing!';
+heldRod.visible=rodOwned;
+}
+
+function showPanel(id,on){
+$(id).style.display=on?'block':'none';
+}
+
+let menuOpen=false;
+function setBuildMenu(v){
+menuOpen=v;
+showPanel('buildPanel',v);
+}
+
+$('startBtn').onclick=()=>{
+$('start').style.display='none';
+renderer.domElement.requestPointerLock();
+}
+;
+renderer.domElement.addEventListener('click',()=>{
+if(!menuOpen&&$('start').style.display==='none'&&document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock();
+}
+);
+
+let yaw=0,pitch=.18,velocityY=0,onGround=true;
+const keys={
+}
+;
+let moving=false;
+
+document.addEventListener('mousemove',e=>{
+if(document.pointerLockElement===renderer.domElement&&!menuOpen){
+yaw-=e.movementX*.0022;
+pitch=THREE.MathUtils.clamp(pitch+e.movementY*.0017,-.12,.58);
+}
+}
+);
+
+document.addEventListener('keydown',e=>{
+if(['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();
+const was=keys[e.code];
+keys[e.code]=true;
+if(e.code==='KeyB'&&!e.repeat)setBuildMenu(!menuOpen);
+if(e.code==='Escape')setBuildMenu(false);
+if(e.code==='KeyE'&&!e.repeat&&!menuOpen)interact();
+if(e.code==='Space'&&!was){
+if(activeCast&&activeCast.state==='bite'){
+reelPress();
+}
+else if(!menuOpen&&onGround){
+velocityY=7;
+onGround=false;
+}
+}
+}
+);
+document.addEventListener('keyup',e=>keys[e.code]=false);
+
+renderer.domElement.addEventListener('mousedown',e=>{
+if(e.button===0&&!menuOpen&&rodOwned&&document.pointerLockElement===renderer.domElement)castLine();
+}
+);
+
+$('closeBuild').onclick=()=>setBuildMenu(false);
+$('hutBtn').onclick=()=>build('hut');
+document.addEventListener('mousedown',e=>{
+if(menuOpen&&!$('buildPanel').contains(e.target))setBuildMenu(false);
+}
+);
+
+function nearestThing(){
+let best=null,dist=Infinity;
+for(const it of interactables){
+const d=Math.hypot(player.position.x-it.x,player.position.z-it.z);
+if(d<2.55&&d<dist){
+best=it;
+dist=d;
+}
+}
+for(const t of trees){
+const d=Math.hypot(player.position.x-t.x,player.position.z-t.z);
+if(d<2.45&&d<dist){
+best={
+type:'tree',x:t.x,z:t.z,tree:t}
+;
+dist=d;
+}
+}
+return best;
+}
+
+function interact(){
+const it=nearestThing();
+if(!it){
+say('Nothing nearby to interact with.');
+return;
+}
+if(it.type==='tree'){
+if(!it.tree.ready){
+say('This palm has already been gathered.');
+return;
+}
+it.tree.ready=false;
+wood+=3;
+it.tree.group.scale.multiplyScalar(.88);
+say('+3 wood gathered!');
+updateHUD();
+return;
+}
+if(it.type==='barrel'){
+if(rodOwned){
+say('You already have a fishing rod. Head to the shore and left-click to cast.');
+return;
+}
+rodOwned=true;
+say('You picked up a fishing rod! Go to the shore and left-click to cast.');
+updateHUD();
+return;
+}
+if(it.type==='fire'){
+if(activeCast){
+say('Reel in or cancel your fishing line first.');
+return;
+}
+const raw=fishInventory.find(f=>!f.cooked);
+if(!raw){
+say('You need a raw fish to cook. Catch one first!');
+return;
+}
+raw.cooked=true;
+cooked++;
+say(`You cooked a ${raw.name}. It is ready to eat!`);
+const idx=fishInventory.indexOf(raw);
+fishInventory.splice(idx,1);
+say(`You ate the ${raw.name}. Restored your energy!`);
+updateHUD();
+return;
+}
+if(it.type==='monkey'){
+if(!fishInventory.length){
+say('The monkey wants fish! Catch some and bring them here.');
+return;
+}
+const amount=fishInventory.length;
+let earned=0;
+for(const f of fishInventory)earned+=f.value;
+fishInventory.length=0;
+coins+=earned;
+say(`Monkey trade complete: sold ${amount} fish for ${earned} coins!`);
+updateHUD();
+}
+}
+
+function castLine(){
+if(activeCast){
+if(activeCast.state==='waiting'){
+clearLine();
+activeCast=null;
+say('You reeled your line back in.');
+return;
+}
+if(activeCast.state==='bite'){
+say('Keep pressing SPACE to reel in the fish!');
+return;
+}
+}
+const forward=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+const origin=player.position.clone().add(new THREE.Vector3(0,1.65,0));
+const bobberPos=player.position.clone().addScaledVector(forward,3.6);
+bobberPos.y=.92;
+if(Math.hypot(bobberPos.x,bobberPos.z)>16.8){
+say('Move closer to the water before casting.');
+return;
+}
+activeCast={
+state:'waiting',time:3+Math.random()*2,bobberPos,progress:0}
+;
+bobber=mesh(new THREE.SphereGeometry(.12,10,7),mat(0xff624b),scene,bobberPos.x,bobberPos.y,bobberPos.z);
+say('Line cast! Wait for a bite…');
+}
+
+// Fish species have different typical sizes, rarity, colours and base prices.
+// A rarity-weighted roll makes large species less common; individual weight is
+// sampled from a right-skewed distribution so trophy-sized fish are rarer still.
+const fishTypes=[
+{
+name:'Silver sardine',rarity:34,min:.08,max:.32,typical:.18,color:0xa9c7d1,base:5}
+,
+{
+name:'Clownfish',rarity:23,min:.12,max:.65,typical:.3,color:0xf28b35,base:8}
+,
+{
+name:'Blue tang',rarity:18,min:.25,max:1.8,typical:.8,color:0x328bd2,base:11}
+,
+{
+name:'Mackerel',rarity:14,min:.4,max:3.2,typical:1.2,color:0x779da4,base:13}
+,
+{
+name:'Reef grouper',rarity:7,min:1.2,max:8.5,typical:3.4,color:0x8d9860,base:17}
+,
+{
+name:'Golden snapper',rarity:3,min:1.5,max:12,typical:4.2,color:0xe4ad43,base:24}
+,
+{
+name:'Moonlit marlin',rarity:1,min:8,max:45,typical:17,color:0x6c9fe0,base:35}
+
+];
+
+function chooseFishSpecies(){
+
+ const total=fishTypes.reduce((sum,f)=>sum+f.rarity,0);
+
+ let roll=Math.random()*total;
+
+ for(const f of fishTypes){
+roll-=f.rarity;
+if(roll<=0)return f;
+}
+
+ return fishTypes[0];
+
+}
+
+function rollFishWeight(species){
+
+ const a=Math.random(),b=Math.random();
+
+ // Square-root bias favours smaller catches while allowing rare heavy specimens.
+ const t=Math.pow(a*b,0.72);
+
+ return Math.min(species.max,species.min+(species.max-species.min)*t);
+
+}
+
+function fishPrice(species,weight){
+
+ return Math.max(1,Math.round(species.base*Math.pow(weight/species.typical,.72)));
+
+}
+
+function makeFishModel(species,weight,parent){
+
+ const g=new THREE.Group();
+
+ const scale=THREE.MathUtils.clamp(.45+Math.pow(weight/species.typical,.38)*.55,.38,2.8);
+
+ g.scale.setScalar(scale);
+
+ const bodyMat=mat(species.color,.48,.08);
+
+ const bellyMat=mat(0xe8e0c7,.7,0);
+
+ const finMat=mat(new THREE.Color(species.color).multiplyScalar(.72));
+
+ mesh(new THREE.SphereGeometry(.22,16,11),bodyMat,g,0,0,0).scale.set(1.55,.72,.65);
+
+ mesh(new THREE.SphereGeometry(.115,12,8),bodyMat,g,.28,.025,.005).scale.set(.8,.8,.8);
+
+ mesh(new THREE.ConeGeometry(.16,.28,7),finMat,g,-.34,.015,0).rotation.z=Math.PI/2;
+
+ mesh(new THREE.ConeGeometry(.105,.2,7),finMat,g,-.02,.12,0).rotation.z=-.25;
+
+ mesh(new THREE.ConeGeometry(.1,.18,7),finMat,g,-.03,-.12,0).rotation.z=.25;
+
+ mesh(new THREE.SphereGeometry(.13,10,7),bellyMat,g,.04,-.075,.015).scale.set(1.25,.4,.58);
+
+ mesh(new THREE.SphereGeometry(.028,8,6),white,g,.27,.055,.09);
+
+ mesh(new THREE.SphereGeometry(.014,7,5),mat(0x17242a),g,.29,.055,.113);
+
+ if(parent)parent.add(g);
+
+ return g;
+
+}
+
+function reelPress(){
+
+ if(!activeCast||activeCast.state!=='bite')return;
+
+ activeCast.progress+=.085;
+
+ catchProgress=activeCast.progress;
+
+ $('catchFill').style.width=Math.min(100,catchProgress*100)+'%';
+
+ if(activeCast.progress>=1){
+
+  const species=chooseFishSpecies();
+
+  const weight=rollFishWeight(species);
+
+  const f={
+name:species.name,weight,value:fishPrice(species,weight),color:species.color,typical:species.typical,cooked:false}
+;
+
+  fishInventory.push(f);
+
+  // Briefly show the actual catch model beside the player, scaled by its weight.
+  if(window.lastCatchModel)scene.remove(window.lastCatchModel);
+
+  const catchModel=makeFishModel(species,weight,scene);
+
+  catchModel.position.copy(player.position).add(new THREE.Vector3(.85,2.05,.2));
+
+  catchModel.rotation.y=-.25;
+
+  window.lastCatchModel=catchModel;
+
+  clearLine();
+activeCast=null;
+$('catchWrap').style.display='none';
+
+  say(`Caught ${f.name} · ${weight.toFixed(2)} kg · worth ${f.value} monkey coins!`);
+
+  updateHUD();
+
+ }
+
+}
+
+function build(type){
+if(type==='fire'){
+say('There is already a campfire in the island clearing.');
+return;
+}
+const cost=5;
+if(wood<cost){
+say('Not enough wood — gather it from palm trees.');
+return;
+}
+wood-=cost;
+builds++;
+const forward=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
+const p=player.position.clone().addScaledVector(forward,3.2);
+p.x=THREE.MathUtils.clamp(p.x,-9,9);
+p.z=THREE.MathUtils.clamp(p.z,-9,9);
+{
+const g=new THREE.Group();
+g.position.set(p.x,1.53,p.z);
+g.rotation.y=yaw;
+scene.add(g);
+const wallMat=mat(0x98633b);
+mesh(new THREE.CylinderGeometry(.1,.1,1.7,8),wallMat,g,-1.05,.8,-.8);
+mesh(new THREE.CylinderGeometry(.1,.1,1.7,8),wallMat,g,1.05,.8,-.8);
+mesh(new THREE.CylinderGeometry(.1,.1,1.7,8),wallMat,g,-1.05,.8,.8);
+mesh(new THREE.CylinderGeometry(.1,.1,1.7,8),wallMat,g,1.05,.8,.8);
+for(let i=0;
+i<5;
+i++)mesh(new THREE.CylinderGeometry(.09,.09,2.2,7),M.plank,g,0,.25+i*.29,.82).rotation.z=Math.PI/2;
+const roofmat=mat(0x74472c);
+const r1=mesh(new THREE.BoxGeometry(1.5,.15,2.5),roofmat,g,-.58,1.85,0);
+r1.rotation.z=.52;
+const r2=mesh(new THREE.BoxGeometry(1.5,.15,2.5),roofmat,g,.58,1.85,0);
+r2.rotation.z=-.52;
+}
+say('A little wooden shelter is built!');
+setBuildMenu(false);
+updateHUD();
+}
+
+// Beach sparkle glints, driftwood and a small fishing spot marker
+for(let i=0;
+i<12;
+i++){
+const a=Math.random()*Math.PI*2,r=11.4+Math.random()*1.2;
+const drift=mesh(new THREE.CylinderGeometry(.045,.06,.7+Math.random()*.7,6),M.barkLight,scene,Math.cos(a)*r,1.02,Math.sin(a)*r);
+drift.rotation.z=Math.random()*Math.PI;
+drift.rotation.x=Math.random()*.3;
+}
+
+// Dense but lightweight ground dressing: varied grass blades, tiny flowers,
+// pebbles and shell fragments break up the smooth procedural terrain.
+const flowerMats=[mat(0xffd7e2),mat(0xffe6a1),mat(0xe8f2ff)];
+
+for(let i=0;
+i<190;
+i++){
+
+ const a=Math.random()*Math.PI*2;
+
+ const r=2.5+Math.random()*8.9;
+
+ const x=Math.cos(a)*r,z=Math.sin(a)*r;
+
+ const tuft=new THREE.Group();
+tuft.position.set(x,1.54,z);
+scene.add(tuft);
+
+ const bladeCount=3+Math.floor(Math.random()*4);
+
+ for(let j=0;
+j<bladeCount;
+j++){
+
+  const blade=mesh(new THREE.ConeGeometry(.035+Math.random()*.025,.22+Math.random()*.25,4),Math.random()>.45?M.grass2:M.darkGrass,tuft,(Math.random()-.5)*.13,.1, (Math.random()-.5)*.13);
+
+  blade.rotation.z=(Math.random()-.5)*.45;
+
+ }
+
+ if(i%11===0){
+
+  const stem=mesh(new THREE.CylinderGeometry(.008,.012,.16,5),M.leaf,tuft,0,.13,0);
+
+  mesh(new THREE.SphereGeometry(.055,8,6),flowerMats[i%flowerMats.length],tuft,0,.23,0);
+
+ }
+
+}
+
+for(let i=0;
+i<75;
+i++){
+
+ const a=Math.random()*Math.PI*2,r=9.7+Math.random()*3.1;
+
+ const pebble=mesh(new THREE.DodecahedronGeometry(.045+Math.random()*.08,0),Math.random()>.5?M.stoneLight:M.sandLight,scene,Math.cos(a)*r,1.02,Math.sin(a)*r);
+
+ pebble.scale.y=.45;
+
+ pebble.rotation.set(Math.random(),Math.random(),Math.random());
+
+}
+
+// Shells are small coloured spiral-like beach decorations.
+for(let i=0;
+i<24;
+i++){
+
+ const a=Math.random()*Math.PI*2,r=10.8+Math.random()*2.1;
+
+ const shell=mesh(new THREE.SphereGeometry(.07,8,6),mat([0xf4d9c1,0xe9a7a1,0xf3e6cf][i%3]),scene,Math.cos(a)*r,1.035,Math.sin(a)*r);
+
+ shell.scale.set(1.25,.42,.75);
+
+}
+
+
+// Main loop
+const clock=new THREE.Clock();
+function animate(){
+requestAnimationFrame(animate);
+const dt=Math.min(clock.getDelta(),.04),now=performance.now();
+const forward=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw)),dir=new THREE.Vector3();
+if(!menuOpen){
+if(keys.KeyW||keys.ArrowUp)dir.add(forward);
+if(keys.KeyS||keys.ArrowDown)dir.sub(forward);
+if(keys.KeyD||keys.ArrowRight)dir.add(right);
+if(keys.KeyA||keys.ArrowLeft)dir.sub(right);
+}
+moving=dir.lengthSq()>0;
+if(moving){
+dir.normalize();
+player.position.addScaledVector(dir,4.8*dt);
+player.rotation.y=Math.atan2(dir.x,dir.z);
+const swing=Math.sin(now*.012)*.42;
+legL.rotation.x=swing;
+legR.rotation.x=-swing;
+armL.rotation.x=-swing*.65;
+armR.rotation.x=swing*.65;
+}
+else{
+legL.rotation.x*=.82;
+legR.rotation.x*=.82;
+armL.rotation.x*=.82;
+armR.rotation.x*=.82;
+}
+const radius=Math.hypot(player.position.x,player.position.z);
+const coastLimit=14.65;
+if(radius>coastLimit){
+player.position.x*=coastLimit/radius;
+player.position.z*=coastLimit/radius;
+}
+velocityY-=18*dt;
+player.position.y+=velocityY*dt;
+if(player.position.y<1.53){
+player.position.y=1.53;
+velocityY=0;
+onGround=true;
+}
+
+const target=new THREE.Vector3(player.position.x,player.position.y+1.35,player.position.z);
+const dist=7.8;
+camera.position.copy(target).add(new THREE.Vector3(-Math.sin(yaw)*dist,2.55+pitch*3,-Math.cos(yaw)*dist));
+camera.lookAt(target.x,target.y+.15,target.z);
+
+// Animated flames and gently bobbing water/bobber
+const wave=Math.sin(now*.001)*.025;
+ocean.position.y=-1.25+wave;
+waterMat.uniforms.uTime.value=now*.001;
+skyMat.uniforms.time.value=now*.001;
+for(const c of clouds){
+c.position.x+=dt*.12;
+if(c.position.x>58)c.position.x=-58;
+}
+for(const f of campfires){
+f.flame.scale.y=.85+Math.sin(now*.018)*.15;
+f.inner.scale.y=.9+Math.cos(now*.021)*.1;
+f.light.intensity=1.1+Math.sin(now*.014)*.2;
+}
+
+if(activeCast){
+activeCast.bobberPos.y=.92+Math.sin(now*.004)*.035;
+if(bobber){
+bobber.position.copy(activeCast.bobberPos);
+bobber.position.y+=wave;
+}
+if(activeCast.state==='waiting'){
+activeCast.time-=dt;
+if(activeCast.time<=0){
+activeCast.state='bite';
+activeCast.progress=0;
+$('catchWrap').style.display='block';
+say('BITE! Press SPACE repeatedly to reel it in!');
+}
+}
+updateLine();
+}
+
+const near=nearestThing();
+let ptext='';
+if(near){
+if(near.type==='tree')ptext=near.tree.ready?'Press E to gather wood (+3)':'This palm has been gathered';
+if(near.type==='barrel')ptext=rodOwned?'You already have a fishing rod':'Press E to take a fishing rod';
+if(near.type==='fire')ptext='Press E to cook and eat a fish';
+if(near.type==='monkey')ptext='Press E to sell all fish to the monkey';
+}
+prompt.textContent=ptext;
+prompt.style.opacity=ptext?'1':'0';
+renderer.render(scene,camera);
+}
+
+updateHUD();
+animate();
+addEventListener('resize',()=>{
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+}
+);
+
+}
+)();
+
+
+</script>
+</body></html>
 
